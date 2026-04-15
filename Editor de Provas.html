@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador EEEFM - Fazenda Emílio Schroeder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* CONFIGURAÇÃO OBRIGATÓRIA: TIMES NEW ROMAN 11PT */
+        * { box-sizing: border-box; }
+        body { font-family: "Times New Roman", Times, serif; background-color: #f0f2f5; }
+
+        /* FORÇAR ESTILO NA PROVA E RETIRAR RECUO DE PARÁGRAFO */
+        #printableArea, #printableArea *, .prova-container, .prova-container * {
+            font-family: "Times New Roman", Times, serif !important;
+            text-indent: 0 !important; 
+        }
+
+        .prova-container {
+            font-size: 11pt !important;
+            line-height: 1.2;
+            color: #000;
+            background: white;
+            margin: 20px auto;
+            padding: 1cm;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            transition: width 0.3s ease;
+        }
+
+        /* ORIENTAÇÃO DA PÁGINA */
+        .retrato { width: 210mm; min-height: 297mm; }
+        .paisagem { width: 297mm; min-height: 210mm; }
+
+        @media print {
+            body { background: white; padding: 0; margin: 0; }
+            .no-print { display: none !important; }
+            .prova-container { margin: 0 !important; padding: 1cm !important; box-shadow: none !important; border: none !important; }
+            
+            .retrato { width: 210mm; height: 297mm; }
+            .paisagem { width: 297mm; height: 210mm; }
+            @page { margin: 0; }
+            .questao { break-inside: avoid; }
+        }
+
+        /* DUAS COLUNAS */
+        .corpo-prova {
+            column-count: 2;
+            column-gap: 30px;
+            column-rule: 0.5px solid #000;
+            margin-top: 15px;
+        }
+
+        /* QUESTÃO: SEM RECUO, NÚMERO E ENUNCIADO INLINE */
+        .questao { 
+            break-inside: avoid; 
+            margin-bottom: 15px; 
+            text-align: justify;
+            display: block; 
+        }
+
+        .questao-header { 
+            font-weight: bold; 
+            display: inline;
+            margin-right: 2px;
+        }
+
+        .questao-enunciado {
+            display: inline;
+        }
+
+        /* Espaçamento entre parágrafos (sem recuo) */
+        .questao-enunciado p, .questao-enunciado div {
+            margin: 0 !important;
+            padding: 0;
+            display: inline; 
+        }
+        
+        .questao-enunciado p + p, .questao-enunciado div + div {
+            display: block; 
+            margin-top: 0 !important;
+        }
+
+        /* IMAGEM: OCUPA 100% DA LARGURA DA COLUNA DISPONÍVEL */
+        .img-questao { 
+            width: 100%; 
+            height: auto; 
+            display: block; 
+            margin: 10px 0; 
+            border: 0.5px solid #eee; /* Borda sutil apenas para visualização */
+        }
+
+        /* CABEÇALHO */
+        .cabecalho { border: 2px solid #000; display: grid; grid-template-columns: 1fr 140px; margin-bottom: 15px; }
+        .cabecalho-dados { padding: 8px; border-right: 2px solid #000; }
+        .nome-escola { font-size: 12pt; font-weight: bold; text-transform: uppercase; border-bottom: 2px solid #000; margin-bottom: 5px; display: block; }
+
+        .cabecalho-nota { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; font-weight: bold; }
+        .nota-box-title { font-size: 8pt; border-bottom: 1px solid #000; width: 90%; margin-bottom: 10px; }
+
+        .label { font-weight: bold; margin-right: 5px; text-transform: uppercase; font-size: 8.5pt; }
+        .linha-info { display: flex; margin-bottom: 4px; border-bottom: 1px solid #eee; }
+
+        /* PAINEL LATERAL */
+        #qEnunciadoEditor {
+            min-height: 120px; background: white; color: black; padding: 10px;
+            border-radius: 4px; outline: none; border: 1px solid #cbd5e1;
+            font-family: "Times New Roman", Times, serif; font-size: 11pt;
+        }
+        .toolbar button { padding: 4px 10px; background: #475569; border-radius: 4px; color: white; font-size: 11px; font-weight: bold; }
+        #qAlternativasArea { width: 100%; min-height: 80px; background: white; color: black; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 13px; }
+        .item-lista-edicao { background: #1e293b; border: 1px solid #334155; padding: 8px; border-radius: 6px; margin-bottom: 6px; }
+    </style>
+</head>
+<body class="flex flex-col lg:flex-row min-h-screen">
+
+    <!-- PAINEL DE CONTROLE -->
+    <div class="w-full lg:w-[450px] bg-slate-900 text-white p-5 no-print overflow-y-auto h-screen sticky top-0 border-r border-slate-700 shadow-2xl">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <h2 class="text-xl font-bold text-blue-400">Editor de Provas</h2>
+                <p class="text-[10px] text-slate-400 uppercase tracking-widest">EEEFM Fazenda Emílio Schroeder</p>
+            </div>
+            <button onclick="novaProva()" class="text-[10px] bg-red-900 px-2 py-1 rounded hover:bg-red-700 transition">LIMPAR TUDO</button>
+        </div>
+
+        <div class="mb-4 p-3 bg-slate-800 rounded-lg border border-slate-700">
+            <label class="text-xs font-bold text-slate-400 block mb-2 uppercase">Orientação da Página:</label>
+            <select id="orientacaoPagina" onchange="alterarOrientacao()" class="w-full p-2 text-black text-sm rounded">
+                <option value="retrato" selected>Vertical (Retrato) - Padrão</option>
+                <option value="paisagem">Horizontal (Paisagem)</option>
+            </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 mb-4 border-b border-slate-700 pb-4">
+            <button onclick="exportarProva()" class="bg-blue-700 hover:bg-blue-600 p-2 rounded text-xs font-bold transition"><i class="fa fa-save mr-1"></i> SALVAR ARQUIVO</button>
+            <label class="bg-slate-700 hover:bg-slate-600 p-2 rounded text-xs font-bold cursor-pointer text-center transition">
+                <i class="fa fa-folder-open mr-1"></i> ABRIR ARQUIVO
+                <input type="file" id="importFile" class="hidden" accept=".json" onchange="importarProva(event)">
+            </label>
+        </div>
+        
+        <div class="space-y-2 mb-4">
+            <input type="text" id="h-prof" placeholder="Nome do Professor" class="w-full p-2 text-black text-sm rounded">
+            <div class="grid grid-cols-2 gap-2">
+                <input type="text" id="h-disc" placeholder="Disciplina" class="p-2 text-black text-sm rounded">
+                <input type="text" id="h-turma" placeholder="Turma" class="p-2 text-black text-sm rounded">
+            </div>
+            <input type="text" id="h-valor" placeholder="Valor Total da Prova" class="w-full p-2 text-black text-sm rounded bg-yellow-50">
+        </div>
+
+        <div class="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
+            <div class="flex justify-between items-center mb-2">
+                <h3 id="form-title" class="text-blue-300 font-bold text-xs uppercase">Enunciado</h3>
+                <div class="toolbar flex gap-1">
+                    <button onclick="execCmd('bold')">B</button>
+                    <button onclick="execCmd('italic')">I</button>
+                    <button onclick="execCmd('underline')">U</button>
+                </div>
+            </div>
+            <div id="qEnunciadoEditor" contenteditable="true" class="mb-3"></div>
+            
+            <div class="grid grid-cols-2 gap-2 mb-3">
+                <input type="text" id="qValorIndividual" class="p-2 text-black text-sm rounded" placeholder="Valor Questão">
+                <select id="qTipo" class="p-2 text-black text-sm rounded" onchange="toggleInputs()">
+                    <option value="objetiva">Objetiva</option>
+                    <option value="discursiva">Discursiva</option>
+                </select>
+            </div>
+
+            <label class="text-[10px] text-slate-400 block mb-1 uppercase">Imagem do Enunciado:</label>
+            <input type="file" id="qImagem" accept="image/*" class="text-xs w-full mb-3 text-slate-400">
+
+            <div id="wrapperAlternativas">
+                <label class="text-[10px] text-slate-400 block mb-1">Alternativas (uma por linha):</label>
+                <textarea id="qAlternativasArea" placeholder="Aperte Enter para cada nova opção"></textarea>
+            </div>
+
+            <button id="btn-add" onclick="addQuestao()" class="w-full bg-blue-600 hover:bg-blue-500 py-3 rounded-lg font-bold text-sm mt-3 transition shadow-lg">ADICIONAR QUESTÃO</button>
+            <button id="btn-cancel" onclick="cancelarEdicao()" class="hidden w-full bg-slate-600 py-1 rounded mt-2 text-xs">CANCELAR</button>
+        </div>
+
+        <div class="mt-4 flex items-center gap-2 text-sm bg-slate-800 p-3 rounded-lg border border-slate-700">
+            <input type="checkbox" id="checkGabarito" onchange="renderizarTudo()" class="w-4 h-4">
+            <label for="checkGabarito">Incluir Folha de Respostas</label>
+        </div>
+
+        <div class="mt-6 pb-32">
+            <h3 class="text-xs font-bold text-slate-500 uppercase mb-3">Organizar Questões</h3>
+            <div id="listaEdicaoLateral" class="space-y-2"></div>
+        </div>
+
+        <div class="fixed bottom-0 left-0 w-[450px] p-5 bg-slate-900 border-t border-slate-700 no-print">
+            <button onclick="window.print()" class="w-full bg-emerald-600 hover:bg-emerald-500 py-4 rounded-xl font-bold shadow-lg transition">
+                <i class="fa fa-print mr-2"></i> IMPRIMIR / GERAR PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- ÁREA DA PROVA -->
+    <div class="flex-1 p-4 flex justify-center bg-gray-300 overflow-x-auto">
+        <div id="printableArea" class="prova-container retrato">
+            <div class="cabecalho">
+                <div class="cabecalho-dados">
+                    <span class="nome-escola">EEEFM Fazenda Emílio Schroeder</span>
+                    <div class="linha-info">
+                        <span class="label">Professor(a):</span> <span id="v-prof"></span>
+                        <span class="label" style="margin-left:20px">Data:</span> <span>____/____/____</span>
+                    </div>
+                    <div class="linha-info">
+                        <span class="label">Disciplina:</span> <span id="v-disc" style="min-width: 120px;"></span>
+                        <span class="label" style="margin-left:20px">Turma:</span> <span id="v-turma"></span>
+                    </div>
+                    <div class="linha-info" style="border:0"><span class="label">Aluno(a):</span> <span style="flex:1; border-bottom: 1px solid #000;"></span></div>
+                </div>
+                <div class="cabecalho-nota">
+                    <div class="nota-box-title">NOTA</div>
+                    <div class="text-2xl" style="line-height: 1;">____</div>
+                    <div id="v-valor-total" class="text-xs font-normal mt-2"></div>
+                </div>
+            </div>
+
+            <div id="listaQuestoes" class="corpo-prova"></div>
+
+            <div id="areaGabarito" class="hidden mt-8 border-t-2 border-dashed pt-4">
+                <h4 class="text-center font-bold text-xs uppercase mb-2">Folha de Respostas</h4>
+                <div id="gabaritoItens" class="grid grid-cols-5 gap-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let questoes = [];
+        let editandoIndex = null;
+        let imgTmp = null;
+
+        function execCmd(cmd) { document.execCommand(cmd, false, null); }
+
+        function alterarOrientacao() {
+            const val = document.getElementById('orientacaoPagina').value;
+            const prova = document.getElementById('printableArea');
+            prova.classList.remove('retrato', 'paisagem');
+            prova.classList.add(val);
+            salvarLocalStorage();
+        }
+
+        ['prof', 'disc', 'turma', 'valor'].forEach(c => {
+            document.getElementById(`h-${c}`).addEventListener('input', e => {
+                if(c === 'valor') document.getElementById('v-valor-total').innerText = e.target.value ? `Valor: ${e.target.value}` : "";
+                else document.getElementById(`v-${c}`).innerText = e.target.value;
+                salvarLocalStorage();
+            });
+        });
+
+        function toggleInputs() {
+            document.getElementById('wrapperAlternativas').style.display = document.getElementById('qTipo').value === 'objetiva' ? 'block' : 'none';
+        }
+
+        function exportarProva() {
+            const dados = { prof: document.getElementById('h-prof').value, disc: document.getElementById('h-disc').value, turma: document.getElementById('h-turma').value, valorTotal: document.getElementById('h-valor').value, orientacao: document.getElementById('orientacaoPagina').value, questoes: questoes, gabarito: document.getElementById('checkGabarito').checked };
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(dados)], {type: 'application/json'}));
+            a.download = `Prova_${dados.disc || 'Doc'}.json`;
+            a.click();
+        }
+
+        function importarProva(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const d = JSON.parse(e.target.result);
+                document.getElementById('h-prof').value = d.prof || "";
+                document.getElementById('h-disc').value = d.disc || "";
+                document.getElementById('h-turma').value = d.turma || "";
+                document.getElementById('h-valor').value = d.valorTotal || "";
+                document.getElementById('orientacaoPagina').value = d.orientacao || "retrato";
+                document.getElementById('v-prof').innerText = d.prof || "";
+                document.getElementById('v-disc').innerText = d.disc || "";
+                document.getElementById('v-turma').innerText = d.turma || "";
+                document.getElementById('v-valor-total').innerText = d.valorTotal ? `Valor: ${d.valorTotal}` : "";
+                document.getElementById('checkGabarito').checked = d.gabarito || false;
+                questoes = d.questoes || [];
+                alterarOrientacao();
+                renderizarTudo();
+            };
+            reader.readAsText(file);
+        }
+
+        function salvarLocalStorage() {
+            const d = { prof: document.getElementById('h-prof').value, disc: document.getElementById('h-disc').value, turma: document.getElementById('h-turma').value, valorTotal: document.getElementById('h-valor').value, orientacao: document.getElementById('orientacaoPagina').value, q: questoes };
+            localStorage.setItem('prova_schroeder_v11', JSON.stringify(d));
+        }
+
+        function addQuestao() {
+            const enunciado = document.getElementById('qEnunciadoEditor').innerHTML;
+            const tipo = document.getElementById('qTipo').value;
+            const valor = document.getElementById('qValorIndividual').value;
+            const file = document.getElementById('qImagem').files[0];
+            const alts = document.getElementById('qAlternativasArea').value.split('\n').map(l => l.trim()).filter(l => l !== "");
+
+            if (enunciado === "" || enunciado === "<br>") return alert("Preencha o enunciado!");
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => finalizarSalvamento(enunciado, tipo, alts, e.target.result, valor);
+                reader.readAsDataURL(file);
+            } else {
+                finalizarSalvamento(enunciado, tipo, alts, imgTmp, valor);
+            }
+        }
+
+        function finalizarSalvamento(enunciado, tipo, alts, imagem, valor) {
+            const dados = { enunciado, tipo, alternativas: alts, imagem, valor };
+            if (editandoIndex !== null) { questoes[editandoIndex] = dados; editandoIndex = null; }
+            else { questoes.push(dados); }
+            limpar(); renderizarTudo(); salvarLocalStorage();
+        }
+
+        function mover(index, dir) {
+            const nova = index + dir;
+            if (nova < 0 || nova >= questoes.length) return;
+            [questoes[index], questoes[nova]] = [questoes[nova], questoes[index]];
+            renderizarTudo(); salvarLocalStorage();
+        }
+
+        function editar(index) {
+            editandoIndex = index;
+            const q = questoes[index];
+            document.getElementById('qEnunciadoEditor').innerHTML = q.enunciado;
+            document.getElementById('qTipo').value = q.tipo;
+            document.getElementById('qValorIndividual').value = q.valor || "";
+            imgTmp = q.imagem;
+            document.getElementById('qAlternativasArea').value = q.tipo === 'objetiva' ? q.alternativas.join('\n') : "";
+            toggleInputs();
+            document.getElementById('btn-add').innerText = "ATUALIZAR QUESTÃO";
+            document.getElementById('btn-cancel').classList.remove('hidden');
+            window.scrollTo(0,0);
+        }
+
+        function excluir(index) {
+            if(confirm("Excluir?")) { questoes.splice(index,1); renderizarTudo(); salvarLocalStorage(); }
+        }
+
+        function limpar() {
+            document.getElementById('qEnunciadoEditor').innerHTML = "";
+            document.getElementById('qAlternativasArea').value = "";
+            document.getElementById('qValorIndividual').value = "";
+            document.getElementById('qImagem').value = "";
+            imgTmp = null;
+            document.getElementById('btn-add').innerText = "ADICIONAR QUESTÃO";
+            document.getElementById('btn-cancel').classList.add('hidden');
+            editandoIndex = null;
+        }
+
+        function renderizarTudo() {
+            const container = document.getElementById('listaQuestoes');
+            const gabaritoCont = document.getElementById('gabaritoItens');
+            const listaLat = document.getElementById('listaEdicaoLateral');
+            container.innerHTML = ""; gabaritoCont.innerHTML = ""; listaLat.innerHTML = "";
+
+            questoes.forEach((q, i) => {
+                const div = document.createElement('div');
+                div.className = "questao";
+                
+                let valStr = q.valor ? `(${q.valor})` : "";
+                
+                // FLUXO INLINE PARA NÚMERO E ENUNCIADO
+                let html = `<span class="questao-header">${i+1}. ${valStr} </span><span class="questao-enunciado">${q.enunciado}`;
+                
+                // IMAGEM RENDERIZADA DENTRO DO FLUXO DO ENUNCIADO
+                if(q.imagem) html += `<img src="${q.imagem}" class="img-questao">`;
+                
+                html += `</span>`; // Fim da questao-enunciado
+
+                if(q.tipo === 'objetiva') {
+                    html += `<div style="margin-left: 1.2rem; margin-top: 4px;">`;
+                    const letras = ['a','b','c','d','e','f'];
+                    q.alternativas.forEach((alt, idx) => {
+                        html += `<div>(${letras[idx]}) ${alt}</div>`;
+                    });
+                    html += `</div>`;
+                    gabaritoCont.innerHTML += `<div class="border p-1 text-[8pt] text-center font-bold">${i+1}: A B C D E</div>`;
+                } else {
+                    html += `<div style="margin-top: 8px; border-bottom: 0.5px solid #000; height: 18px; width: 100%;"></div>`.repeat(5);
+                }
+                
+                div.innerHTML = html; container.appendChild(div);
+
+                listaLat.innerHTML += `
+                    <div class="item-lista-edicao text-xs">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-blue-400">Q${i+1}</span>
+                            <div class="flex gap-1">
+                                <button onclick="mover(${i}, -1)" class="p-1 hover:bg-slate-700 rounded text-lg">↑</button>
+                                <button onclick="mover(${i}, 1)" class="p-1 hover:bg-slate-700 rounded text-lg">↓</button>
+                                <button onclick="editar(${i})" class="text-orange-400 p-1"><i class="fa fa-edit"></i></button>
+                                <button onclick="excluir(${i})" class="text-red-400 p-1"><i class="fa fa-trash"></i></button>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+            document.getElementById('areaGabarito').style.display = (document.getElementById('checkGabarito').checked && questoes.some(q => q.tipo === 'objetiva')) ? 'block' : 'none';
+        }
+
+        function novaProva() { if(confirm("Limpar tudo?")) { localStorage.removeItem('prova_schroeder_v11'); location.reload(); } }
+
+        window.onload = () => carregarSessao();
+
+        function carregarSessao() {
+            const cache = localStorage.getItem('prova_schroeder_v11');
+            if(cache) {
+                const d = JSON.parse(cache);
+                document.getElementById('h-prof').value = d.prof || "";
+                document.getElementById('h-disc').value = d.disc || "";
+                document.getElementById('h-turma').value = d.turma || "";
+                document.getElementById('h-valor').value = d.valorTotal || "";
+                document.getElementById('orientacaoPagina').value = d.orientacao || "retrato";
+                document.getElementById('v-prof').innerText = d.prof || "";
+                document.getElementById('v-disc').innerText = d.disc || "";
+                document.getElementById('v-turma').innerText = d.turma || "";
+                document.getElementById('v-valor-total').innerText = d.valorTotal ? `Valor: ${d.valorTotal}` : "";
+                document.getElementById('checkGabarito').checked = d.gabarito || false;
+                questoes = d.questoes || [];
+                alterarOrientacao();
+                renderizarTudo();
+            } else {
+                alterarOrientacao();
+            }
+            document.execCommand('defaultParagraphSeparator', false, 'p');
+        }
+    </script>
+</body>
+</html>
